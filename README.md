@@ -110,8 +110,6 @@ python -m lmms_eval --model qvid_llava \
 ## ⚠️ Notes
 
 - Supported: LLaVA-1.5-7B (13B should work, since head counts are read from the config, but has not been verified), batch size 1, `attn_implementation="sdpa"`, `transformers==4.37.2`. `apply_qvid` raises an error for other settings.
-- The text used for scoring is every token after the image: the question, any task instruction, and the `ASSISTANT:` prompt.
-
 ## 📌 Citation
 
 ```bibtex
