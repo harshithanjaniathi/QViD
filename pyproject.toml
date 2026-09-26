@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qvid"
+version = "0.1.0"
+description = "QViD: training-free, query-aware visual token pruning for LVLMs"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+# torch, LLaVA and lmms-eval are installed separately (see README): LLaVA pins
+# torch==2.1.2, so it is installed with --no-deps, and lmms-eval declares
+# transformers>=4.39.2 while LLaVA-1.5 and QViD need 4.37.2.
+dependencies = [
+    "transformers==4.37.2",
+    "tokenizers==0.15.2",
+    "accelerate>=0.26",
+    "sentencepiece",
+    "protobuf",
+    "einops",
+    "pillow",
+    "requests",
+]
+
+[project.entry-points."lmms_eval.models"]
+qvid_llava = "qvid.eval.manifest:MANIFEST"
+
+[tool.setuptools.packages.find]
+include = ["qvid*"]
