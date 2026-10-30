@@ -27,9 +27,9 @@ The core implementation is in [`llava/model/language_model/QViD.py`](llava/model
 
 ## 🔍 Method
 
-QViD performs query-aware visual-token pruning by explicitly modeling query–vision interactions. At pruning layer $\ell$, it forms the interaction matrix $M = Q_{\text{txt}} K_{\text{vis}}^\top$, extracts its dominant low-rank modes with SVD, and scores each visual token by its participation in these modes. The top $K$ tokens are retained for subsequent reasoning.
+QViD performs query-aware visual-token pruning by explicitly modeling query–vision interactions. At a pruning layer $\ell$ of the LLM it forms the interaction matrix $M = Q_{\text{txt}} K_{\text{vis}}^\top$, extracts its dominant low-rank modes with SVD, and scores each visual token by its participation in these modes. The top $K$ tokens are retained for subsequent reasoning.
 
-**Query–vision interaction matrix.** Let $H^{(\ell)}_{\text{vis}} \in \mathbb{R}^{N_v \times d}$ and $H^{(\ell)}_{\text{txt}} \in \mathbb{R}^{N_q \times d}$ be the hidden states of the visual and query tokens at layer $\ell$. For a given attention head, using the frozen query and key projections $W_Q, W_K$,
+**Query–vision interaction matrix.** Let $`H^{(\ell)}_{\text{vis}} \in \mathbb{R}^{N_v \times d}`$ and $`H^{(\ell)}_{\text{txt}} \in \mathbb{R}^{N_q \times d}`$ be the hidden states of the visual and query tokens at layer $\ell$. For a given attention head, using the frozen query and key projections $W_Q, W_K$,
 
 $$Q_{\text{txt}} = H^{(\ell)}_{\text{txt}} W_Q, \qquad K_{\text{vis}} = H^{(\ell)}_{\text{vis}} W_K, \qquad M = Q_{\text{txt}} K_{\text{vis}}^\top \in \mathbb{R}^{N_q \times N_v}.$$
 
