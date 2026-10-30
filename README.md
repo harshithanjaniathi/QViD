@@ -1,10 +1,19 @@
 <div align=center>
 
-<h1>QViD: Vision Token Pruning via Query–Vision Interaction Decomposition</h1>
+<h1>Vision Token Pruning via Query–Vision Interaction Decomposition</h1>
 
-<!-- TODO: authors, affiliations -->
+<h4 align="center">
 
-<!-- TODO: arXiv / project links -->
+Harshithanjani Athi<sup>1</sup>,
+Sravan Kumar Ankireddy<sup>1</sup>,
+Jianzhong Charlie Zhang<sup>2</sup>,
+Hyeji Kim<sup>1</sup>
+
+<sup>1</sup>The University of Texas at Austin, <sup>2</sup>Samsung Research America
+
+</h4>
+
+[![arXiv](https://img.shields.io/badge/arXiv-2610.33215-b31b1b.svg)](https://arxiv.org/abs/2610.33215)
 
 </div>
 
@@ -47,7 +56,7 @@ conda activate qvid
 # PyTorch (pick the wheel for your CUDA version)
 pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
 
-# lmms-eval v0.7.1 + the QViD evaluation patch (see "Evaluation protocol" below)
+# lmms-eval v0.7.1, with our evaluation patch
 git clone --branch v0.7.1 --depth 1 https://github.com/EvolvingLMMs-Lab/lmms-eval.git
 git -C lmms-eval apply ../patches/lmms-eval-v0.7.1.patch
 pip install -e lmms-eval
@@ -71,43 +80,17 @@ huggingface-cli login
 
 ## 🚀 Evaluation
 
-Each benchmark has a script under [`scripts/v1_5/eval/`](scripts/v1_5/eval). The argument is the number of visual tokens kept (default 64; 576 = vanilla LLaVA-1.5).
+[`scripts/v1_5/eval.sh`](scripts/v1_5/eval.sh) runs [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval). The first argument is the number of visual tokens kept (default 64; 576 = vanilla LLaVA-1.5), the optional second a comma-separated list of lmms-eval tasks (default: all 11 benchmarks).
 
-Example for evaluating TextVQA results:
 ```bash
-CUDA_VISIBLE_DEVICES=0 bash scripts/v1_5/eval/textvqa.sh 64
-```
-Example for evaluating MME results:
-```bash
-CUDA_VISIBLE_DEVICES=0 bash scripts/v1_5/eval/mme.sh 64
-```
-All 11 benchmarks in one run:
-```bash
-CUDA_VISIBLE_DEVICES=0 bash scripts/v1_5/eval/all.sh 64
+# All 11 benchmarks with 64 visual tokens
+CUDA_VISIBLE_DEVICES=0 bash scripts/v1_5/eval.sh 64
+
+# Selected benchmarks
+CUDA_VISIBLE_DEVICES=0 bash scripts/v1_5/eval.sh 64 textvqa_val,mme
 ```
 
-| Script | lmms-eval task | Script | lmms-eval task |
-|---|---|---|---|
-| `gqa.sh` | `gqa` | `mmstar.sh` | `mmstar` |
-| `sqa.sh` | `scienceqa_img` | `ai2d.sh` | `ai2d` |
-| `textvqa.sh` | `textvqa_val` | `chartqa.sh` | `chartqa` |
-| `pope.sh` | `pope` | `ocrbench.sh` | `ocrbench` |
-| `mme.sh` | `mme` | `hallusionbench.sh` | `hallusion_bench_image` |
-| `mmbench.sh` | `mmbench_en_dev` | `all.sh` | all of the above |
-
-Results are written to `./results/llava-v1.5-7b-qvid<NUM_TOKENS>/<benchmark>/`.
-
-### Evaluation protocol
-
-[`patches/lmms-eval-v0.7.1.patch`](patches/lmms-eval-v0.7.1.patch) makes lmms-eval v0.7.1 score QViD the way our reported numbers were obtained:
-
-| Benchmark | Change |
-|---|---|
-| TextVQA | OCR tokens are included in the prompt (`ocr: true`) for `qvid_llava`. |
-| MMBench-dev | Scored locally with circular accuracy; no GPT judge, and unparsable answers count as wrong instead of being filled in at random. |
-| HallusionBench | Accuracies are aggregated with the `*_intern` metric functions. |
-
-Without the patch, TextVQA and MMBench scores will differ.
+The 11 benchmarks: `gqa`, `scienceqa_img`, `textvqa_val`, `pope`, `mme`, `mmbench_en_dev`, `mmstar`, `ai2d`, `chartqa`, `ocrbench`, `hallusion_bench_image`. Results are written to `./results/llava-v1.5-7b-qvid<NUM_TOKENS>/`.
 
 ## 💻 Usage in your own code
 
@@ -133,21 +116,18 @@ A single-image demo:
 python scripts/demo.py --image path/to/image.jpg --question "What is written on the sign?" --num-tokens 64
 ```
 
-## ⚠️ Notes
-
-- Supported: LLaVA-1.5 (7B verified), batch size 1, `transformers==4.37.2`, SDPA attention (the transformers default; `set_qvid()` raises an error if the model was loaded with `use_flash_attn=True` or `attn_implementation="eager"`).
-- LLaVA-1.6 (`anyres`, a variable number of visual tokens per image) is not supported; `set_qvid()` raises an error for it.
-
-## 📊 Results
-
-<!-- TODO: main results table (LLaVA-1.5-7B, 11 benchmarks, token budgets) -->
-
 ## 📌 Citation
 
+If you find QViD useful, please cite:
+
 ```bibtex
-<!-- TODO -->
+@misc{athi2026qvid,
+      title={Vision Token Pruning via Query-Vision Interaction Decomposition},
+      author={Harshithanjani Athi and Sravan Kumar Ankireddy and Jianzhong Charlie Zhang and Hyeji Kim},
+      year={2026},
+      eprint={2610.33215},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2610.33215},
+}
 ```
-
-## 🙏 Acknowledgements
-
-Built on [LLaVA](https://github.com/haotian-liu/LLaVA) and evaluated with [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval). The repository layout follows [V<sup>2</sup>Drop](https://github.com/xuyang-liu16/V2Drop).
