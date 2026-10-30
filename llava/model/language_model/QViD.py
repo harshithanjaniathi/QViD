@@ -113,6 +113,11 @@ class QViDLlamaModel(LlamaModel):
                                  "on SDPA's implicit causal mask).")
             if self.config.num_key_value_heads != self.config.num_attention_heads:
                 raise NotImplementedError("QViD scoring assumes num_key_value_heads == num_attention_heads.")
+            if getattr(self.config, "image_aspect_ratio", "square") == "anyres" or \
+                    getattr(self.config, "mm_patch_merge_type", "flat") != "flat":
+                raise NotImplementedError(
+                    "QViD supports LLaVA-1.5 only: this model uses a variable number of visual "
+                    "tokens per image (LLaVA-1.6 'anyres' / non-flat patch merging).")
             if not 0 <= layer < len(self.layers):
                 raise ValueError(f"layer must be in [0, {len(self.layers) - 1}], got {layer}")
             if num_tokens < 1:

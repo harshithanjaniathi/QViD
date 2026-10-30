@@ -136,7 +136,7 @@ python scripts/demo.py --image path/to/image.jpg --question "What is written on 
 ## ⚠️ Notes
 
 - Supported: LLaVA-1.5 (7B verified), batch size 1, `transformers==4.37.2`, SDPA attention (the transformers default; `set_qvid()` raises an error if the model was loaded with `use_flash_attn=True` or `attn_implementation="eager"`).
-- Images with a variable number of visual tokens (LLaVA-1.6 `anyres`) are passed through unpruned.
+- LLaVA-1.6 (`anyres`, a variable number of visual tokens per image) is not supported; `set_qvid()` raises an error for it.
 
 ## 📊 Results
 
