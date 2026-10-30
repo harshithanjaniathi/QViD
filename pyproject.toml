@@ -4,27 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qvid"
-version = "0.1.0"
-description = "QViD: training-free, query-aware visual token pruning for LVLMs"
+version = "0.2.0"
+description = "QViD: Vision Token Pruning via Query-Vision Interaction Decomposition (LLaVA-1.5 fork)"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-# torch, LLaVA and lmms-eval are installed separately (see README): LLaVA pins
-# torch==2.1.2, so it is installed with --no-deps, and lmms-eval declares
-# transformers>=4.39.2 while LLaVA-1.5 and QViD need 4.37.2.
+# torch is installed separately (pick the wheel for your CUDA, see README).
+# lmms-eval declares transformers>=4.39.2, but LLaVA-1.5 needs 4.37.2: install
+# lmms-eval first, then this package, which pins transformers back.
 dependencies = [
     "transformers==4.37.2",
     "tokenizers==0.15.2",
     "accelerate>=0.26",
     "sentencepiece",
     "protobuf",
+    "shortuuid",
     "einops",
     "pillow",
     "requests",
+    # Evaluation: datasets>=5 needs huggingface_hub>=1.0, which transformers 4.37.2 does not allow.
+    "datasets==4.5.0",
 ]
 
+[project.optional-dependencies]
+train = ["deepspeed==0.12.6", "ninja", "wandb", "peft", "bitsandbytes"]
+
 [project.entry-points."lmms_eval.models"]
-qvid_llava = "qvid.eval.manifest:MANIFEST"
+qvid_llava = "llava.eval.lmms_eval_qvid:MANIFEST"
+
+[project.urls]
+"Homepage" = "https://github.com/harshithanjaniathi/QViD"
 
 [tool.setuptools.packages.find]
-include = ["qvid*"]
+include = ["llava*"]

@@ -1,0 +1,159 @@
+diff --git a/lmms_eval/tasks/hallusion_bench/hallusion_bench_image.yaml b/lmms_eval/tasks/hallusion_bench/hallusion_bench_image.yaml
+index f30aab8..3c74f51 100755
+--- a/lmms_eval/tasks/hallusion_bench/hallusion_bench_image.yaml
++++ b/lmms_eval/tasks/hallusion_bench/hallusion_bench_image.yaml
+@@ -22,22 +22,13 @@ generation_kwargs:
+   do_sample: false
+ metric_list:
+   - metric: aAcc
+-    aggregation: !function evaluate_hb.hb_aggregation_result_aAcc
++    aggregation: !function evaluate_hb.hb_aggregation_result_aAcc_intern
+     higher_is_better: true
+   - metric: qAcc
+-    aggregation: !function evaluate_hb.hb_aggregation_result_qAcc
++    aggregation: !function evaluate_hb.hb_aggregation_result_qAcc_intern
+     higher_is_better: true
+   - metric: fAcc
+-    aggregation: !function evaluate_hb.hb_aggregation_result_fAcc
++    aggregation: !function evaluate_hb.hb_aggregation_result_fAcc_intern
+     higher_is_better: true
+-  # - metric: aAcc
+-  #  aggregation: !function evaluate_hb.hb_aggregation_result_aAcc_intern
+-  #  higher_is_better: true
+-  # - metric: qAcc
+-  #  aggregation: !function evaluate_hb.hb_aggregation_result_qAcc_intern
+-  #  higher_is_better: true
+-  # - metric: fAcc
+-  #  aggregation: !function evaluate_hb.hb_aggregation_result_fAcc_intern
+-  #  higher_is_better: true
+ metadata:
+   - version: 0.0
+diff --git a/lmms_eval/tasks/mmbench/en_utils.py b/lmms_eval/tasks/mmbench/en_utils.py
+index 67546f2..45744e0 100755
+--- a/lmms_eval/tasks/mmbench/en_utils.py
++++ b/lmms_eval/tasks/mmbench/en_utils.py
+@@ -108,7 +108,61 @@ def mmbench_process_results(doc, results):
+ 
+ def mmbench_aggregate_dev_results_eval(results, args):
+     print("============= MMBench-EN(Dev) Detailed Results =============")
+-    overall_acc, category_acc, l2_category_acc = mmbench_evaluator.eval_result(results, eval_method="openai")
++    # Always use local circular accuracy (matches the official MMBench metric).
++    # Circular eval groups question variants by index % 1e6 and requires ALL variants
++    # to be answered correctly for a question to count as correct.
++    import string as _string
++    import pandas as _pd
++
++    def _can_infer(answer, row):
++        answer = str(answer).strip()
++        valid = [c for c in _string.ascii_uppercase[:5]
++                 if str(row.get(c, "nan")) not in ("nan", "", "None")]
++        if not valid:
++            valid = list(_string.ascii_uppercase[:4])
++        if answer in valid:
++            return answer
++        splits = answer.split()
++        for c in valid:
++            if c in splits or f"({c})" in splits or f"{c}." in splits:
++                return c
++        if splits and splits[0].rstrip(".()") in valid:
++            return splits[0].rstrip(".()")
++        answer_lower = answer.lower()
++        for c in valid:
++            v = str(row.get(c, ""))
++            if v not in ("nan", "", "None") and v.lower() in answer_lower:
++                return c
++        return None
++
++    data = _pd.DataFrame(results).sort_values(by="index")
++    answer_map = dict(zip(data["index"], data["answer"]))
++    cate_map = dict(zip(data["index"], data["category"]))
++    data_main = data[data["index"] < int(1e6)]
++
++    hit = tot = 0
++    cat_hit: dict = {}
++    cat_tot: dict = {}
++    for _, row in data_main.iterrows():
++        idx = row["index"]
++        cat = str(cate_map.get(idx, "other"))
++        sub_data = data[data["index"] % int(1e6) == idx]
++        group_hit = 1
++        for _, srow in sub_data.iterrows():
++            gt = str(answer_map[srow["index"]])
++            pred = _can_infer(str(srow.get("prediction", "")), srow)
++            if pred is None or pred != gt:
++                group_hit = 0
++                break
++        hit += group_hit; tot += 1
++        cat_hit[cat] = cat_hit.get(cat, 0) + group_hit
++        cat_tot[cat] = cat_tot.get(cat, 0) + 1
++
++    overall_acc = hit / tot if tot else 0.0
++    category_acc = {c: cat_hit[c] / cat_tot[c] for c in cat_tot}
++    l2_category_acc = {}
++    eval_logger.info(f"MMBench circular scoring: {hit}/{tot} = {overall_acc*100:.2f}%")
++
+     file = generate_submission_file("mmbench_en_dev_results.json", args)
+     details_info = {
+         "overall_acc": overall_acc,
+diff --git a/lmms_eval/tasks/mmbench/mmbench_evals.py b/lmms_eval/tasks/mmbench/mmbench_evals.py
+index 83a067f..d80a8e5 100755
+--- a/lmms_eval/tasks/mmbench/mmbench_evals.py
++++ b/lmms_eval/tasks/mmbench/mmbench_evals.py
+@@ -91,10 +91,12 @@ class MMBench_Evaluator:
+         splits = [x.strip() for x in answer.split()]
+         if count(splits, choices) == 1:
+             for ch in choices:
+-                if "A" in splits and len(splits) > 3:
+-                    eval_logger.info(f"A might be a quantifier in the string: {answer}.")
+-                    break
+                 if ch in splits:
++                    # If "A" appears in a long answer, it might be a quantifier — UNLESS
++                    # it is the very first word (model answered "A <description of choice A>").
++                    if ch == "A" and len(splits) > 3 and splits[0] != "A":
++                        eval_logger.info(f"A might be a quantifier in the string: {answer}.")
++                        break
+                     return ch
+         tups = [("", "."), ("", ","), ("", ":"), ("", ")"), ("", ")."), ("(", ")"), ("(", ")."), (":", ""), (":", ","), (":", "."), (":", ")"), (":", ").")]
+         for tup in tups:
+@@ -142,6 +144,9 @@ class MMBench_Evaluator:
+         return response.json()
+ 
+     def get_chat_response(self, prompt, temperature=0, max_tokens=256, n=1, patience=5, sleep_time=3):
++        # If API key is missing/invalid placeholder, fail immediately to avoid minutes of retries
++        if not self.API_KEY or self.API_KEY in ("YOUR_API_KEY", "", "None"):
++            return "Failed to obtain answer via API"
+         messages = [
+             {"role": "user", "content": prompt},
+         ]
+@@ -194,13 +199,9 @@ class MMBench_Evaluator:
+                     retry -= 1
+ 
+             if retry == 0:
+-                num_options = sum([ch in item for ch in "ABCD"])
+-                if num_options >= 2:
+-                    chars = string.ascii_uppercase[:num_options]
+-                    chars = chars + "E"
+-                    num_options += 1
+-                    tmp = rd.randint(0, num_options - 1)
+-                    return chars[tmp], "Failed to predict, thus randomly generate one. "
++                # GPT unavailable and can_infer failed: return deterministic wrong answer
++                # instead of random guess, so scores are consistent across runs.
++                return "Z", "Failed to predict, GPT unavailable, marking as wrong. "
+ 
+     # Extract answer from multiple rolling records
+     def eval_sub_data(self, sub_data, answer_map):
+diff --git a/lmms_eval/tasks/textvqa/_default_template_textvqa_yaml b/lmms_eval/tasks/textvqa/_default_template_textvqa_yaml
+index 982a9bf..7a925b3 100755
+--- a/lmms_eval/tasks/textvqa/_default_template_textvqa_yaml
++++ b/lmms_eval/tasks/textvqa/_default_template_textvqa_yaml
+@@ -12,6 +12,10 @@ lmms_eval_specific_kwargs:
+     pre_prompt: ""
+     post_prompt: "\nAnswer the question using a single word or phrase."
+     ocr: false
++  qvid_llava:
++    pre_prompt: ""
++    post_prompt: "\nAnswer the question using a single word or phrase."
++    ocr: true
+   qwen_vl:
+     pre_prompt: ""
+     post_prompt: " Answer:"

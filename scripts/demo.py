@@ -15,8 +15,6 @@ from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_i
 from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 
-from qvid import apply_qvid
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -34,7 +32,7 @@ def main():
         args.model_path, None, get_model_name_from_path(args.model_path),
         device=args.device, attn_implementation="sdpa",
     )
-    apply_qvid(model, num_tokens=args.num_tokens, scoring_layer=args.scoring_layer)
+    model.get_model().set_qvid(num_tokens=args.num_tokens, layer=args.scoring_layer)
 
     conv = conv_templates["vicuna_v1"].copy()
     conv.append_message(conv.roles[0], DEFAULT_IMAGE_TOKEN + "\n" + args.question)

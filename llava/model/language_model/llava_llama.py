@@ -24,14 +24,17 @@ from transformers import AutoConfig, AutoModelForCausalLM, \
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
+from llava.constants import IMAGE_TOKEN_INDEX
+
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
+from .QViD import QViDLlamaModel
 
 
 class LlavaConfig(LlamaConfig):
     model_type = "llava_llama"
 
 
-class LlavaLlamaModel(LlavaMetaModel, LlamaModel):
+class LlavaLlamaModel(LlavaMetaModel, QViDLlamaModel):  # QViD: LlamaModel -> QViDLlamaModel
     config_class = LlavaConfig
 
     def __init__(self, config: LlamaConfig):
@@ -54,6 +57,20 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
     def get_model(self):
         return self.model
 
+    def _qvid_locate_image(self, input_ids, images):
+        """QViD: record where the visual tokens will sit once the image placeholder
+        in `input_ids` is expanded (one image per sample, LLaVA-1.5 'flat' features)."""
+        model = self.get_model()
+        model.qvid_vision_span = None
+        if images is None or input_ids is None or input_ids.shape[0] != 1 or input_ids.shape[1] == 1:
+            return
+        if getattr(self.config, "mm_patch_merge_type", "flat") != "flat" or \
+                getattr(self.config, "image_aspect_ratio", "square") == "anyres":
+            return  # variable visual-token count (LLaVA-1.6); not supported
+        pos = (input_ids[0] == IMAGE_TOKEN_INDEX).nonzero(as_tuple=True)[0]
+        if pos.numel() == 1:
+            model.qvid_vision_span = (int(pos[0]), self.get_vision_tower().num_patches)
+
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -71,6 +88,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         if inputs_embeds is None:
+            self._qvid_locate_image(input_ids, images)
             (
                 input_ids,
                 position_ids,
@@ -114,6 +132,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         if "inputs_embeds" in kwargs:
             raise NotImplementedError("`inputs_embeds` is not supported")
 
+        self._qvid_locate_image(inputs, images)
         if images is not None:
             (
                 inputs,
@@ -134,12 +153,15 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
 
-        return super().generate(
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            inputs_embeds=inputs_embeds,
-            **kwargs
-        )
+        try:
+            return super().generate(
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+                **kwargs
+            )
+        finally:
+            self.get_model().qvid_vision_span = None
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None,
                                       inputs_embeds=None, **kwargs):
