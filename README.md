@@ -17,26 +17,29 @@ Hyeji Kim<sup>1</sup>
 
 </div>
 
-<!-- TODO: <p align="center"><img src="images/overview.png" width="1000"></p> -->
+<p align="center"><img src="images/pipeline.png" width="1000"></p>
 
-> **TL;DR:** QViD is a training-free, plug-and-play visual token pruning method for large vision-language models. At an early LLM layer, it scores each visual token by its leverage in the top singular subspace of the text–visual query–key affinity, computed per attention head, and keeps only the most query-relevant tokens for the remaining layers.
+> **TL;DR:** We observe that the query–vision interaction matrix, naturally induced by the query and key projections already present in transformer attention, is effectively low-rank, with a small number of dominant latent interaction modes capturing query-relevant semantics. Motivated by this observation, we propose Query-Vision Decomposition (QViD), a training-free, query-aware visual token pruning method that exploits this structure.
 
 ## 💥 Core Codes
 
 The core implementation is in [`llava/model/language_model/QViD.py`](llava/model/language_model/QViD.py).
-It provides `QViDLlamaModel`, which replaces `LlamaModel` as LLaVA's language model
-([`llava_llama.py`](llava/model/language_model/llava_llama.py)). Everything else in
-[`llava/`](llava) is [LLaVA](https://github.com/haotian-liu/LLaVA) at commit `c121f04`, unmodified.
 
 ## 🔍 Method
 
-At the input of LLM layer `L` (default `L = 3`), let `Q` be the query projections of the text tokens after the image and `K` the key projections of the visual tokens, both from layer `L`. For every attention head `h`:
+QViD performs query-aware visual-token pruning by explicitly modeling query–vision interactions. At pruning layer $\ell$, it forms the interaction matrix $M = Q_{\text{txt}} K_{\text{vis}}^\top$, extracts its dominant low-rank modes with SVD, and scores each visual token by its participation in these modes. The top $K$ tokens are retained for subsequent reasoning.
 
-1. **Affinity:** `M_h = Q_h K_hᵀ` with shape `N_q × N_v`, where `N_q ≪ N_v`.
-2. **Right singular vectors via QR:** `M_hᵀ = Q R` (reduced QR), then `Rᵀ = U S Vᵀ` (SVD of a small `N_q × N_q` matrix). The right singular vectors of `M_h` are exactly `Q V`, obtained without decomposing the full `N_q × N_v` matrix.
-3. **Leverage score:** the score of visual token `j` is the squared norm of row `j` of the top-`r` right singular vectors (`r = 16`).
+**Query–vision interaction matrix.** Let $H^{(\ell)}_{\text{vis}} \in \mathbb{R}^{N_v \times d}$ and $H^{(\ell)}_{\text{txt}} \in \mathbb{R}^{N_q \times d}$ be the hidden states of the visual and query tokens at layer $\ell$. For a given attention head, using the frozen query and key projections $W_Q, W_K$,
 
-Scores are averaged over heads and the top-`k` visual tokens are kept. Layers `0 … L−1` see all 576 visual tokens; layers `L …` see only the kept ones. Kept tokens keep their original position ids, so RoPE is unchanged.
+$$Q_{\text{txt}} = H^{(\ell)}_{\text{txt}} W_Q, \qquad K_{\text{vis}} = H^{(\ell)}_{\text{vis}} W_K, \qquad M = Q_{\text{txt}} K_{\text{vis}}^\top \in \mathbb{R}^{N_q \times N_v}.$$
+
+**Visual-token scores.** For each head we compute the singular value decomposition $M = U \Sigma V^\top$ and score visual token $j$ by its participation in the top $r$ right singular directions, averaged over the $H$ attention heads:
+
+$$s_j = \frac{1}{H} \sum_{h=1}^{H} \sum_{k=1}^{r} \left(V^{(h)}_{jk}\right)^2 .$$
+
+For short queries, $r$ is replaced by $r_{\text{eff}} = \min(r, N_q, N_v)$.
+
+**Visual-token pruning.** The top $K$ visual tokens with the largest scores $s_j$ are passed to the remaining LLM layers, with $K$ determined by the token budget. QViD is entirely training-free and uses only the frozen projections already present in the model. We use layer $\ell = 3$ and $r = 16$.
 
 ## 🛠 Preparation
 
