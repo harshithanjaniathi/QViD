@@ -17,6 +17,12 @@ Hyeji Kim<sup>1</sup>
 
 </div>
 
+## 🔥 News
+
+* **`2026.10.23`** 📄 Our paper is available on [arXiv](https://arxiv.org/abs/2610.33215).
+* **`2026.09.24`** 🎉 QViD is accepted to **NeurIPS 2026** as a **Spotlight**!
+* **`2026.05.31`** 🎉 QViD is accepted to the **AdaptFM** workshop at **ICML 2026**!
+
 <p align="center"><img src="images/pipeline.png" width="1000"></p>
 
 > **TL;DR:** We observe that the query–vision interaction matrix, naturally induced by the query and key projections already present in transformer attention, is effectively low-rank, with a small number of dominant latent interaction modes capturing query-relevant semantics. Motivated by this observation, we propose Query-Vision Decomposition (QViD), a training-free, query-aware visual token pruning method that exploits this structure.
