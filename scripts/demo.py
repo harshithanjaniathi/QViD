@@ -23,7 +23,8 @@ def main():
     parser.add_argument("--question", required=True)
     parser.add_argument("--num-tokens", type=int, default=64,
                         help="visual tokens kept from the scoring layer on (576 = no pruning)")
-    parser.add_argument("--scoring-layer", type=int, default=3)
+    parser.add_argument("--scoring-layer", type=int, default=2,
+                        help="0-based decoder layer index (2 = the paper's layer 3)")
     parser.add_argument("--device", default="cuda:0")
     args = parser.parse_args()
 

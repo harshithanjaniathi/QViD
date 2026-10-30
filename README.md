@@ -70,8 +70,7 @@ git clone --branch v0.7.1 --depth 1 https://github.com/EvolvingLMMs-Lab/lmms-eva
 git -C lmms-eval apply ../patches/lmms-eval-v0.7.1.patch
 pip install -e lmms-eval
 
-# QViD (this LLaVA fork). Installed last: it pins transformers==4.37.2, which
-# LLaVA-1.5 needs. pip warns that lmms-eval asks for a newer one; that is expected.
+# QViD (pins transformers==4.37.2 for LLaVA-1.5; install after lmms-eval)
 pip install -e .
 ```
 
@@ -108,7 +107,7 @@ from llava.model.builder import load_pretrained_model
 
 tokenizer, model, image_processor, _ = load_pretrained_model(
     "liuhaotian/llava-v1.5-7b", None, "llava-v1.5-7b")
-model.get_model().set_qvid(num_tokens=64, layer=3, num_components=16)
+model.get_model().set_qvid(num_tokens=64, layer=2, num_components=16)
 
 # Use model.generate(...) exactly as in LLaVA; pruning happens inside.
 ```
@@ -116,7 +115,7 @@ model.get_model().set_qvid(num_tokens=64, layer=3, num_components=16)
 | Argument | Default | Description |
 |---|---|---|
 | `num_tokens` | 64 | Visual tokens kept from `layer` onward (`None` or 576 = no pruning). |
-| `layer` | 3 | LLM layer at whose input tokens are scored and pruned. |
+| `layer` | 2 | 0-based index of the LLM layer at whose input tokens are scored and pruned (2 = layer 3 in the paper). |
 | `num_components` | 16 | Rank `r` of the singular subspace. |
 
 A single-image demo:

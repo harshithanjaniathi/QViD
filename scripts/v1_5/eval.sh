@@ -7,7 +7,7 @@
 #   bash scripts/v1_5/eval.sh 64 textvqa_val,mme      # selected benchmarks
 #   bash scripts/v1_5/eval.sh 576                     # vanilla LLaVA-1.5 (no pruning)
 #
-# NUM_TOKENS: visual tokens kept from LLM layer 3 on (default 64; 576 = no pruning).
+# NUM_TOKENS: visual tokens kept from LLM layer 3 on (0-based index 2) (default 64; 576 = no pruning).
 # MODEL_PATH: Hugging Face id or local path (default ./liuhaotian/llava-v1.5-7b if present).
 set -euo pipefail
 
@@ -17,7 +17,7 @@ MODEL_PATH=${MODEL_PATH:-$([ -d ./liuhaotian/llava-v1.5-7b ] && echo ./liuhaotia
 
 python -m lmms_eval \
     --model qvid_llava \
-    --model_args pretrained=${MODEL_PATH},num_tokens=${NUM_TOKENS},scoring_layer=3,num_components=16 \
+    --model_args pretrained=${MODEL_PATH},num_tokens=${NUM_TOKENS},scoring_layer=2,num_components=16 \
     --tasks ${TASKS} \
     --batch_size 1 \
     --log_samples \

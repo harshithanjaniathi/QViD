@@ -49,7 +49,7 @@ class QViDLlava(lmms):
         self,
         pretrained: str = "liuhaotian/llava-v1.5-7b",
         num_tokens: int = 64,
-        scoring_layer: int = 3,
+        scoring_layer: int = 2,
         num_components: int = 16,
         conv_template: str = "vicuna_v1",
         device: str = "cuda:0",

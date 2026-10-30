@@ -4,8 +4,9 @@ Core implementation for LLaVA-1.5 (transformers 4.37.2).
 
 `QViDLlamaModel` replaces `LlamaModel` as the language model of LLaVA
 (see llava_llama.py). During the prefill pass, at the input of decoder layer
-`qvid_layer` (default 3), it scores the visual tokens with that layer's own
-query/key projections and keeps the `qvid_num_tokens` most query-relevant ones:
+`qvid_layer` (0-based index, default 2 = the 3rd layer, the paper's l = 3), it
+scores the visual tokens with that layer's own query/key projections and keeps
+the `qvid_num_tokens` most query-relevant ones:
 
     layers 0 .. L-1   see all visual tokens (576 for LLaVA-1.5)
     layer  L          visual tokens scored and pruned
@@ -89,7 +90,7 @@ class QViDLlamaModel(LlamaModel):
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
         self.qvid_num_tokens = None    # None = no pruning (vanilla LLaVA)
-        self.qvid_layer = 3
+        self.qvid_layer = 2  # 0-based
         self.qvid_num_components = 16
         # (start, length) of the visual tokens in the current sequence; set by
         # LlavaLlamaForCausalLM for each new prompt and consumed by the prefill.
@@ -102,8 +103,10 @@ class QViDLlamaModel(LlamaModel):
             attn.rotary_emb = FullTableRotaryEmbedding(
                 attn.head_dim, max_position_embeddings=attn.max_position_embeddings, base=attn.rope_theta)
 
-    def set_qvid(self, num_tokens: Optional[int] = 64, layer: int = 3, num_components: int = 16):
+    def set_qvid(self, num_tokens: Optional[int] = 64, layer: int = 2, num_components: int = 16):
         """Enable QViD: keep `num_tokens` visual tokens from decoder layer `layer` on.
+
+        `layer` is a 0-based index into the decoder layers (2 = the paper's l = 3).
 
         num_tokens=None (or >= the number of visual tokens) disables pruning.
         """
